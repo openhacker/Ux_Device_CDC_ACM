@@ -260,15 +260,21 @@ static void save_bytes_read(unsigned char *buffer, int length)
 {
 	static unsigned char kept[128];
 	static int bytes_saved = 0;
+	static int lines = 0;
 
 	if(*buffer == '\n' || *buffer == '\r') {
 		/* have full line */
 		unsigned long result_bytes;
+		char string[40];
 
+		lines++;
 		*(kept + bytes_saved) = '\r';
 		bytes_saved++;
+		sprintf(string, "Line #%d ", lines);
+
+		ux_device_class_cdc_acm_write(cdc_acm, (unsigned char *) string, strlen(string), &result_bytes);
+
 		ux_device_class_cdc_acm_write(cdc_acm, kept, bytes_saved, &result_bytes);
-		printf("wrote line %*s bytes\n", bytes_saved, kept);
 		bytes_saved = 0;
 	} else {
 		/* check limits */
@@ -305,11 +311,15 @@ VOID usbx_cdc_acm_read_thread_entry(ULONG thread_input)
 
 #endif /* UX_DEVICE_CLASS_CDC_ACM_TRANSMISSION_DISABLE */
 
+      unsigned long result_bytes;
+
       /* Read the received data in blocking mode */
       ux_device_class_cdc_acm_read(cdc_acm, (UCHAR *)UserRxBufferFS, 64,
                                    &actual_length);
+      ux_device_class_cdc_acm_write(cdc_acm, (UCHAR *) UserRxBufferFS, actual_length, &result_bytes);
       if (actual_length != 0)
       {
+	
 	save_bytes_read(UserRxBufferFS, actual_length);
 
         /* Send the data via UART */
