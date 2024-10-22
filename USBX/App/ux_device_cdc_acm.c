@@ -283,6 +283,25 @@ static void save_bytes_read(unsigned char *buffer, int length)
 	}
 }
 
+
+static void date_announcement(void)
+{
+	char buffer[100];
+	int length;
+
+	if(!uart_handler) 
+		Error_Handler();
+
+	sprintf(buffer, "built %s: %s\n\r", __DATE__, __TIME__);
+	length = strlen(buffer);
+        if(HAL_UART_Transmit_DMA(uart_handler, (UCHAR *) buffer,  length) != HAL_OK) {
+		Error_Handler();
+	}
+	
+        tx_thread_sleep(MS_TO_TICK(100));
+}
+	
+
 /**
   * @brief  Function implementing usbx_cdc_acm_thread_entry.
   * @param  thread_input: Not used
@@ -293,17 +312,22 @@ VOID usbx_cdc_acm_read_thread_entry(ULONG thread_input)
   ULONG actual_length;
   ULONG senddataflag = 0;
   UX_SLAVE_DEVICE *device;
-
+  int count = 0;
+  int count2 = 0;
   UX_PARAMETER_NOT_USED(thread_input);
 
   device = &_ux_system_slave->ux_system_slave_device;
 
+
   while (1)
   {
+    count2++;
     /* Check if device is configured */
     if ((device->ux_slave_device_state == UX_DEVICE_CONFIGURED) && (cdc_acm != UX_NULL))
     {
 
+	if(count++ < 0)
+		date_announcement();
 #ifndef UX_DEVICE_CLASS_CDC_ACM_TRANSMISSION_DISABLE
 
       /* Set transmission_status to UX_FALSE for the first time */
@@ -323,10 +347,17 @@ VOID usbx_cdc_acm_read_thread_entry(ULONG thread_input)
 	save_bytes_read(UserRxBufferFS, actual_length);
 
         /* Send the data via UART */
+
         if (HAL_UART_Transmit_DMA(uart_handler, (uint8_t *)UserRxBufferFS, actual_length) != HAL_OK)
         {
           Error_Handler();
         }
+
+	if(UserRxBufferFS[0] == '\r') {
+		const char linefeed = '\n';
+
+		HAL_UART_Transmit_DMA(uart_handler, (uint8_t *) &linefeed, 1);
+	}
 
         /* Wait until the requested flag TX_NEW_TRANSMITTED_DATA is received */
         if (tx_event_flags_get(&EventFlag, TX_NEW_TRANSMITTED_DATA, TX_OR_CLEAR,
