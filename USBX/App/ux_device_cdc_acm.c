@@ -21,6 +21,8 @@
 /* Includes ------------------------------------------------------------------*/
 #include "ux_device_cdc_acm.h"
 #include <stdio.h>
+#include <string.h>
+#include "cli_parser.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -256,25 +258,47 @@ VOID USBD_CDC_ACM_ParameterChange(VOID *cdc_acm_instance)
 
 /* USER CODE BEGIN 1 */
 
+static void write_out_uart(UCHAR *string, int size)
+{
+	int i;
+
+	for(i = 0; i < size; i++) {
+		unsigned long result;
+
+		ux_device_class_cdc_acm_write(cdc_acm, string + i, 1, &result);
+		if(result  != 1) {
+			Error_Handler();
+		}
+	}	
+}
+			
 static void save_bytes_read(unsigned char *buffer, int length)
 {
-	static unsigned char kept[128];
+	static char kept[128];
 	static int bytes_saved = 0;
 	static int lines = 0;
 
 	if(*buffer == '\n' || *buffer == '\r') {
 		/* have full line */
 		unsigned long result_bytes;
-		char string[40];
-
+		char *result;
+		int num_bytes;	
+		
 		lines++;
-		*(kept + bytes_saved) = '\r';
-		bytes_saved++;
-		sprintf(string, "Line #%d ", lines);
 
-		ux_device_class_cdc_acm_write(cdc_acm, (unsigned char *) string, strlen(string), &result_bytes);
+		result = parse_cli(kept, bytes_saved);
+		num_bytes = strlen(result);
 
-		ux_device_class_cdc_acm_write(cdc_acm, kept, bytes_saved, &result_bytes);
+		write_out_uart(result, num_bytes);
+#if 1
+		ux_device_class_cdc_acm_write(cdc_acm, (unsigned char *) result, 
+					num_bytes, &result_bytes);
+#endif
+		if(result_bytes != num_bytes)
+			Error_Handler();
+
+//		ux_device_class_cdc_acm_write(cdc_acm, (unsigned char *) kept, bytes_saved, &result_bytes);
+//		memset(kept, 0, bytes_saved);
 		bytes_saved = 0;
 	} else {
 		/* check limits */
