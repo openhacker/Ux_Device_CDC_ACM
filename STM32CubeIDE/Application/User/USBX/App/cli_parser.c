@@ -40,13 +40,21 @@ static struct command_line_options developer_options[] =
 char *parse_cli(char *input, int length)
 {
 	static char result[100];
+	static int count = 0;
+
 
 	enum { MAX_ARGS = 10 };
+
+
+	memset(result, 0, sizeof result);
+	if(!count++) {
+		snprintf(result, sizeof result, "%s\r\n", __FILE__);
+		return result;
+	}
 
 	int argc  = 0;
 	char *argv[MAX_ARGS];
 
-	memset(result, 0, sizeof result);
 	snprintf(result, sizeof result,  "unknown option = %s\r\n", 
 			input);
 	return result;
